@@ -1,0 +1,33 @@
+[project]
+name = "cycloneai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Dipanshu Raj", email = "dipanshuraj0102@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dask>=2024.1.0",
+    "h5netcdf>=1.3.0",
+    "netcdf4>=1.6.5",
+    "numpy>=1.26.0,<2.0.0",
+    "opencv-python-headless>=4.9.0",
+    "pandas>=2.1.0",
+    "pyresample>=1.28.0",
+    "pyyaml>=6.0.1",
+    "rich>=15.0.0",
+    "satpy>=0.49.0",
+    "scipy>=1.11.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+    "ultralytics>=8.3.0",
+    "xarray>=2024.1.0",
+]
+
+[project.scripts]
+cycloneai = "cycloneai:main"
+
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"

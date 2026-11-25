@@ -221,3 +221,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# CycloneAI datasets and model artifacts
+/data/raw/goes/.git/
+/data/raw/himawari/.git/
+/data/raw/goes/noaa-goes*/
+/data/raw/himawari/[0-9]*/
+/data/raw/ibtracs/*.csv
+/data/processed/
+/training/runs/
+/training/*.pt
