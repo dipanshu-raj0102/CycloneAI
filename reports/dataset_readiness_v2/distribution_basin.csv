@@ -1,0 +1,14 @@
+split,basin,samples,storms
+test,EP,556,13
+test,NI,26,2
+test,SI,57,1
+test,UNKNOWN,20,1
+test,WP,185,5
+train,EP,684,26
+train,NI,127,4
+train,SI,858,22
+train,SP,526,17
+train,UNKNOWN,83,4
+train,WP,1171,33
+val,EP,621,19
+val,UNKNOWN,137,6

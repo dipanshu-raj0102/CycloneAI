@@ -15,5 +15,8 @@ PyYAML>=6.0.1
 
 # Stage 1 & 2 Deep Learning (YOLO26-Pose + PyTorch)
 ultralytics>=8.3.0
-torch>=2.2.0
-torchvision>=0.17.0
+torch>=2.4
+torchvision>=0.19
+numpy>=1.26
+h5py>=3.10
+scikit-learn>=1.4

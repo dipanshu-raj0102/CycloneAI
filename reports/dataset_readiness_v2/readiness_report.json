@@ -1,0 +1,70 @@
+{
+  "dataset": "/home/draj/Projects/CycloneAI/data/processed/intensity_kelvin_final",
+  "status": "REVIEW_REQUIRED",
+  "errors": 0,
+  "warnings": 11,
+  "samples": 5051,
+  "storms": 152,
+  "training_normalization": {
+    "valid_pixels": 692216801,
+    "mean_kelvin": 258.1791296464356,
+    "std_kelvin": 29.795502176199456
+  },
+  "issues": [
+    {
+      "level": "WARNING",
+      "check": "rare class",
+      "detail": "val/C5: 12 images from 2 storms"
+    },
+    {
+      "level": "WARNING",
+      "check": "sensor coverage",
+      "detail": "val lacks himawari08"
+    },
+    {
+      "level": "WARNING",
+      "check": "basin coverage",
+      "detail": "val lacks NI"
+    },
+    {
+      "level": "WARNING",
+      "check": "basin coverage",
+      "detail": "val lacks SI"
+    },
+    {
+      "level": "WARNING",
+      "check": "basin coverage",
+      "detail": "val lacks SP"
+    },
+    {
+      "level": "WARNING",
+      "check": "basin coverage",
+      "detail": "val lacks WP"
+    },
+    {
+      "level": "WARNING",
+      "check": "rare class",
+      "detail": "test/C4: 25 images from 4 storms"
+    },
+    {
+      "level": "WARNING",
+      "check": "rare class",
+      "detail": "test/C5: 12 images from 1 storms"
+    },
+    {
+      "level": "WARNING",
+      "check": "basin coverage",
+      "detail": "test lacks SP"
+    },
+    {
+      "level": "WARNING",
+      "check": "IBTrACS basin mismatch",
+      "detail": "240 rows; see basin_mismatches.csv"
+    },
+    {
+      "level": "WARNING",
+      "check": "scientific review",
+      "detail": "Manual preview inspection and independent raw-scene calibration/geolocation comparison are still required. Sensor temperature differences may reflect basin/intensity differences."
+    }
+  ]
+}
