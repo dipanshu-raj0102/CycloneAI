@@ -1,6 +1,0 @@
-split,sensor_id,samples,storms
-test,goes18,576,14
-test,himawari08,268,8
-train,goes18,845,32
-train,himawari08,2604,73
-val,goes18,758,25

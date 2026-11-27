@@ -1,87 +1,41 @@
 # CycloneAI
 
-CycloneAI builds a YOLO pose dataset from geostationary satellite imagery and IBTrACS tropical cyclone best-track data, then trains a model to detect cyclones and locate their centers.
+CycloneAI uses GOES-16 satellite imagery and NOAA IBTrACS storm tracks for two tasks. An Ultralytics pose model detects tropical cyclones and estimates their centers as single keypoints. A Swin-T model classifies the intensity of storm-centered crops from tropical depression (TD) through Category 5 and estimates wind speed in knots.
 
-The preprocessing pipeline supports GOES-East, GOES-West, and Himawari imagery. It calibrates and reprojects satellite scans to a common grid, creates image tiles and YOLO pose labels, and writes metadata and quality-control previews. Training uses Ultralytics YOLO pose models; the visualization script reports training telemetry and spatial localization errors.
+## Setup
 
-## Repository layout
+Install Python 3.12 and [uv](https://docs.astral.sh/uv/), then run this from the repository root.
 
-```text
-data/
-  raw/                  Input satellite data, IBTrACS CSVs, and preprocessing code
-  processed/            Generated YOLO dataset and metadata
-scripts/
-  prepare_yolo_data.py  Dataset preparation entry point
-src/cycloneai/          Python package entry point
-training/
-  train_yolo.py         Dataset inspection and model training
-  visualize_training.py Training and spatial evaluation reports
+```sh
+uv sync --locked
 ```
 
-Raw satellite imagery, generated datasets, model weights, and training runs are local artifacts and are excluded by `.gitignore`. Keep the raw input files in the directory structure expected by the preprocessing script.
+Save the [NOAA IBTrACS](https://www.ncei.noaa.gov/products/international-best-track-archive) CSV as `data/ibtracs.csv`. Place GOES-16 ABI L2 full-disk NetCDF files in `data/goes16/<YYYYMMDD_HHMM>/IR/` for channel C13 and `data/goes16/<YYYYMMDD_HHMM>/WV/` for channel C08. The timestamp is UTC.
 
-## Requirements
+To fetch imagery from NOAA's public archive, run `uv run python download_goes.py` from `scripts/`. The downloader uses dates configured in the script and writes to `data/goes16_dataset/` by default. Set its `OUTPUT_DIR` to `../data/goes16` before downloading, or move the downloaded timestamp folders into `data/goes16/`.
 
-- Python 3.12 or newer
-- `uv` (recommended) or `pip`
-- GOES ABI Channel 13 and/or Himawari Band 13 source files
-- IBTrACS best-track CSV data
-- A compatible YOLO pose checkpoint for training; a CUDA-capable GPU is recommended
+## Detection and center localization
 
-Install dependencies from the project metadata:
+Run from the repository root. The first command builds the dataset. The second validates it and prints split statistics before training.
 
-```bash
-uv sync
+```sh
+uv run python scripts/preprocess_detection.py --goes data/goes16 --ibtracs data/ibtracs.csv --output data/processed/detection_pose_v2
+uv run python scripts/train_detection.py --data data/processed/detection_pose_v2 --check-only
+uv run python scripts/train_detection.py --data data/processed/detection_pose_v2 --project runs/cyclone_pose
 ```
 
-Or install from `requirements.txt` with pip:
+Detection training defaults to GPU index `0`. Use `--device cpu` for CPU training. Checkpoint and confidence selection use the validation split. Use `--final-test` once the checkpoint and operating point are frozen. See the [detection evaluation summary](reports/detection_final_evaluation/presentation_summary.md) for recorded validation and test results.
 
-```bash
-python -m pip install -r requirements.txt
+## Intensity classification
+
+Run from the repository root. The planning command audits candidate crops before the full preprocessing run.
+
+```sh
+uv run python scripts/preprocess_classification_raw.py --data-root data --plan-only
+uv run python scripts/preprocess_classification_raw.py --data-root data
+uv run python scripts/train_classification.py --data data/processed/classification_raw_v1 --output runs/classification/swin_t
 ```
 
-## Prepare the dataset
+Add `--validate-only` to the training command to check the dataset without training, or `--evaluate-test` to score the selected checkpoint on the held-out test split after training.
 
-Place inputs under `data/raw/` using the directory layout expected by the preprocessing code. By default it reads IBTrACS from `data/raw/ibtracs/ibtracs.ALL.list.v04r01.csv`, GOES data from `data/raw/goes/`, and Himawari data from `data/raw/himawari/`.
-
-Run preprocessing from the repository root:
-
-```bash
-python data/raw/processing.py
-```
-
-The output defaults to `data/processed/yolo26data/`, including train/validation/test image and label splits, `cyclone_pose.yaml`, grid metadata, a tile manifest, and optional previews. Override input and output locations with `--ibtracs`, `--goes-dir`, `--himawari-dir`, and `--out-dir`. See all options with:
-
-```bash
-python data/raw/processing.py --help
-```
-
-## Train and evaluate
-
-Inspect the prepared dataset and train a YOLO pose model:
-
-```bash
-python training/train_yolo.py \
-  --data data/processed/yolo26data/cyclone_pose.yaml \
-  --weights training/yolo26n-pose.pt \
-  --project training/runs
-```
-
-Place a compatible YOLO pose checkpoint at the path passed to `--weights` first (the example expects `training/yolo26n-pose.pt`). Training options include `--epochs`, `--batch`, `--device`, `--project`, and `--name`; use `--help` for the complete list. The command above writes runs and checkpoints under `training/runs/`.
-
-Generate or rerun spatial diagnostics for a training run:
-
-```bash
-python training/visualize_training.py \
-  --run-dir training/runs/cyclone_yolo26 \
-  --data-dir data/processed/yolo26data \
-  --split both
-```
-
-## Data and model notes
-
-The repository does not distribute the large satellite inputs, generated tiles, or model checkpoints. Obtain source data and model weights separately, and check their respective terms of use before redistribution. The preprocessing and training scripts expose additional parameters through their `--help` output.
-
-## License
-
-See [LICENSE](LICENSE).
+Datasets, checkpoints, experiment runs, and generated report files are stored locally. The detection evaluation write-up is kept under `reports/`. Installed dependencies are managed through `pyproject.toml` and `uv.lock`.
