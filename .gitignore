@@ -29,9 +29,19 @@ wheels/
 /dir_tree.txt
 *.pt
 *.pth
+*.keras
 
 # Keep the evaluation write-up alongside generated reports
 /reports/*
 !/reports/detection_final_evaluation/
 /reports/detection_final_evaluation/*
 !/reports/detection_final_evaluation/presentation_summary.md
+
+# Keep the classification metrics referenced by the README
+!/reports/classification_final_evaluation/
+/reports/classification_final_evaluation/*
+!/reports/classification_final_evaluation/validation_best/
+!/reports/classification_final_evaluation/validation_last/
+/reports/classification_final_evaluation/validation_*/*
+!/reports/classification_final_evaluation/validation_best/metrics.json
+!/reports/classification_final_evaluation/validation_last/metrics.json

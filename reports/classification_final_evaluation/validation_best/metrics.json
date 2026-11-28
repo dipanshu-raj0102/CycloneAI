@@ -1,0 +1,20 @@
+{
+  "samples": 4216,
+  "correct": 3785,
+  "accuracy": 0.8977703984819735,
+  "balanced_accuracy": 0.8805455788278703,
+  "macro_precision": 0.8996889275399029,
+  "macro_recall": 0.8805455788278703,
+  "macro_f1": 0.889020308783932,
+  "weighted_f1": 0.8978200930149645,
+  "quadratic_weighted_kappa": 0.9505552777814067,
+  "mcc": 0.8678606444390151,
+  "log_loss": 0.8171066461740523,
+  "within_one_category_accuracy": 0.9739089184060721,
+  "mean_absolute_category_error": 0.1366223908918406,
+  "evaluation_protocol": "stratified random image validation, not an independent test",
+  "macro_roc_auc": 0.9826124081533559,
+  "macro_average_precision": 0.942175116141026,
+  "top_label_ece_10_bins": 0.08113882395537793,
+  "multiclass_brier_score": 0.18165459651388904
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Download all missing GOES-16 C13/C08 pairs for IBTrACS intensity fixes, 2018–2025.
 Default is a dry-run plan; --download writes only missing files. Linux/Python 3.10+.
+Default combined class ceiling is 900 candidate observations (existing + new).
 Uses public unsigned NOAA S3, no AWS account or detection data required.
 """
 from __future__ import annotations
@@ -257,7 +258,22 @@ def plan(args,archive,fixes,pairs,slot_paths):
     for f in fixes:
         if covered(f.time,times,tolerance): existing[f.category]+=1
         else: missing[f.category].append(f)
-    hours=sorted({h for group in missing.values() for f in group for h in needed_hours(f.time,tolerance)})
+    fixes_by_time=sorted(fixes,key=lambda f:f.time); fix_times=[f.time for f in fixes_by_time]
+    def nearest_labels(t):
+        lo=bisect_left(fix_times,t-timedelta(seconds=tolerance))
+        hi=bisect_right(fix_times,t+timedelta(seconds=tolerance))
+        near={}
+        for x in fixes_by_time[lo:hi]:
+            if x.sid not in near or abs(x.time-t)<abs(near[x.sid].time-t): near[x.sid]=x
+        return list(near.values())
+    # A scene can contain more than one cyclone, and a fix can match multiple
+    # existing acquisitions. Count scene-level candidate labels as well as unique
+    # matched fixes; the larger baseline is conservative for the download cap.
+    local_observations=Counter(x.category for p in pairs for x in nearest_labels(p.time))
+    baseline=Counter({c:max(existing[c],local_observations[c]) for c in CLASSES})
+    remaining={c:max(0,args.max_per_class-baseline[c]) for c in CLASSES}
+    active_missing={c:missing[c] if remaining[c]>0 else [] for c in CLASSES}
+    hours=sorted({h for group in active_missing.values() for f in group for h in needed_hours(f.time,tolerance)})
     print(f'Listing {len(hours):,} distinct archive hours using {args.search_workers} workers',flush=True)
     lookup={}; errors={}
     with ThreadPoolExecutor(max_workers=args.search_workers) as pool:
@@ -272,13 +288,15 @@ def plan(args,archive,fixes,pairs,slot_paths):
         raise RuntimeError('Archive listing errors; retry rather than silently producing an incomplete plan. See archive_errors.json')
     selected=[]; counts=Counter(); reasons=Counter(); used_slots=set(); used_folders=set(); total=0
     limit=int(args.max_gb*1e9) if args.max_gb is not None else math.inf
-    # Prefer rare categories and interleave storm IDs; no class cap or storm cap.
-    queues={c:deque(ordered_fixes(missing[c],args.seed+CLASSES.index(c))) for c in reversed(CLASSES)}
-    planned_by_fix=set()
-    fixes_by_time=sorted(fixes,key=lambda f:f.time); fix_times=[f.time for f in fixes_by_time]
+    # Prefer rare classes, interleave storms, and reserve quota for every label
+    # in a scene, not merely the primary class. Existing files are never removed.
+    queues={c:deque(ordered_fixes(active_missing[c],args.seed+CLASSES.index(c))) for c in reversed(CLASSES)}
+    planned_by_fix=set(); added=Counter()
     while any(queues.values()) and (args.max_scenes is None or len(selected)<args.max_scenes):
         for c,q in queues.items():
             if not q: continue
+            if added[c]>=remaining[c]:
+                reasons['class_cap_reached']+=len(q); q.clear(); continue
             if args.max_scenes is not None and len(selected)>=args.max_scenes: break
             f=q.popleft()
             if (f.sid,f.time) in planned_by_fix: continue
@@ -294,18 +312,25 @@ def plan(args,archive,fixes,pairs,slot_paths):
                 if folder in used_folders: continue
                 n=sum(o.size for o,path in dest if not path.exists())
                 if n<=0 or total+n>limit: continue
-                lo=bisect_left(fix_times,pair.time-timedelta(seconds=tolerance)); hi=bisect_right(fix_times,pair.time+timedelta(seconds=tolerance))
-                # For each storm, attach its nearest eligible fix, never multiple labels per scene.
-                near={}
-                for x in fixes_by_time[lo:hi]:
-                    if x.sid not in near or abs(x.time-pair.time)<abs(near[x.sid].time-pair.time): near[x.sid]=x
-                labels=list(near.values())
+                labels=nearest_labels(pair.time)
+                if f not in labels: continue
+                increments=Counter(x.category for x in labels)
+                if any(added[k]+v>remaining[k] for k,v in increments.items()):
+                    reasons['scene_class_cap_conflict']+=1; continue
                 selected.append((f,pair,dest,n,labels)); total+=n
+                added.update(increments)
                 counts[c]+=1; used_slots.add(pair.slot); used_folders.add(folder)
                 planned_by_fix.update((x.sid,x.time) for x in labels)
                 break
             else: reasons['duplicate_conflict_or_budget']+=1
     stats={'existing_matched_fixes':dict(existing),'missing_candidate_fixes':{c:len(missing[c]) for c in CLASSES},
+           'max_total_per_class':args.max_per_class,
+           'existing_candidate_observations_by_class':{c:local_observations[c] for c in CLASSES},
+           'class_cap_baseline':dict(baseline),
+           'remaining_class_capacity_before_download':remaining,
+           'existing_above_cap':{c:baseline[c]-args.max_per_class for c in CLASSES if baseline[c]>args.max_per_class},
+           'planned_new_observations_by_class':{c:added[c] for c in CLASSES},
+           'projected_total_by_class':{c:baseline[c]+added[c] for c in CLASSES},
            'planned_primary_class_counts':dict(counts),'planned_scenes':len(selected),'planned_download_bytes':total,
            'planned_download_gb':total/1e9,'archive_hours':len(hours),'planning_skips':dict(reasons)}
     return selected,stats
@@ -388,6 +413,7 @@ def main():
     p.add_argument('--data-root',type=Path,default=Path('data'))
     p.add_argument('--goes',type=Path); p.add_argument('--ibtracs',type=Path); p.add_argument('--audit-dir',type=Path)
     p.add_argument('--start-year',type=int,default=2018); p.add_argument('--end-year',type=int,default=2025)
+    p.add_argument('--max-per-class',type=int,default=900,help='Maximum total candidate observations per class, including existing archive; never delete existing data')
     p.add_argument('--max-scenes',type=int,default=None); p.add_argument('--max-gb',type=float,default=None,help='Optional maximum new transfer in decimal GB')
     p.add_argument('--max-offset-min',type=float,default=10.); p.add_argument('--max-zenith',type=float,default=70.)
     p.add_argument('--workers',type=int,default=16); p.add_argument('--search-workers',type=int,default=24); p.add_argument('--parts',type=int,default=2)
@@ -396,6 +422,7 @@ def main():
     p.add_argument('--skip-quality-check',action='store_true',help='Only verify file sizes and signatures; defer crop QC to preprocessing')
     modes=p.add_mutually_exclusive_group(); modes.add_argument('--plan-only',action='store_true'); modes.add_argument('--download',action='store_true')
     args=p.parse_args()
+    if args.max_per_class<1: p.error('--max-per-class must be positive')
     if not 2018<=args.start_year<=args.end_year<=2025: p.error('Use years 2018–2025')
     if not 0<args.max_offset_min<=10 or not 0<args.max_zenith<90 or not 0<args.min_valid<=1 or not math.isfinite(args.width_km) or args.width_km<=0 or args.image_size<32 or args.image_size%2: p.error('Invalid quality settings')
     if not 1<=args.workers<=64 or not 1<=args.search_workers<=64 or not 1<=args.parts<=8: p.error('Invalid worker/part counts')
