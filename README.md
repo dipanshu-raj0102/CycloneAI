@@ -40,6 +40,16 @@ Detection training defaults to GPU index `0`. Use `--device cpu` for CPU trainin
 
 Geographic metrics deduplicate detections across overlapping tiles. Test coverage was 115 of 121 planned targets, with geographic recall of 71.1% when all planned targets are counted. Box AP evaluates proxy boxes and pose AP uses Object Keypoint Similarity (OKS). [Detection evaluation summary](reports/detection_final_evaluation/presentation_summary.md)
 
+### Detection confusion matrix and image-level metrics
+
+On 1,187 validation images, a prediction counted as positive if the detector produced any cyclone box at confidence 0.675 or higher. This measures cyclone presence per image. The geographic results above measure center localization.
+
+![Validation confusion matrix for cyclone presence, normalized by actual class](reports/detection_final_evaluation/custom_confusion_matrix/confusion_matrix_normalized.png)
+
+![Image-level detection metrics on the validation split](reports/detection_final_evaluation/custom_confusion_matrix/performance_metrics.png)
+
+The detector correctly rejected **880 of 884** negative images (99.55% specificity). Positive predictions had **98.50% precision**, with four false alarms. The detector found **262 of 303** cyclone images (86.47% recall) and missed 41.
+
 ## Intensity classification
 
 The evaluated ClassCNN takes 128 × 128 images with four channels and predicts one of six classes derived from the source wind labels. The classes are Low Pressure, Depression, Deep Depression, Cyclonic Storm, Severe Cyclonic Storm, and Very Severe Cyclonic Storm.
@@ -66,4 +76,12 @@ The run used 21,076 images and a stratified random 80/20 image split. Both check
 
 [Best checkpoint metrics](reports/classification_final_evaluation/validation_best/metrics.json) · [Last checkpoint metrics](reports/classification_final_evaluation/validation_last/metrics.json)
 
-Datasets, model weights, and experiment runs are local artifacts. The detection summary and classification metrics JSON files are eligible for version control.
+### Classification confusion matrix and per-class metrics
+
+![Epoch 14 validation confusion matrix for the six intensity classes, normalized by actual class](reports/classification_final_evaluation/validation_best/confusion_matrix_normalized.png)
+
+![Epoch 14 validation precision, recall, and F1 for each intensity class](reports/classification_final_evaluation/validation_best/per_class_metrics.png)
+
+On the image-level validation split, **97.39%** of predictions were within one intensity category. Low Pressure had the highest recall (**92.87%**). Very Severe Cyclonic Storm had **96.23% precision** and **82.70% recall**, with 20 of its 185 examples predicted as Severe Cyclonic Storm. On the same images, epoch 14 correctly classified **47 more images** than epoch 20, while epoch 20 had higher macro precision.
+
+Datasets, model weights, and experiment runs are local artifacts. The evaluation summary, selected metrics, and figures linked above are eligible for version control.
